@@ -1,98 +1,203 @@
 import json
-import csv
-from datetime import datetime, timedelta
-from tabulate import tabulate
+import os
+from datetime import datetime
 
-DATA_FILE = "expenses.json"
+EXPENSES_FILE = "expenses.json"
+SETTINGS_FILE = "settings.json"
 
-def load_expenses():
-    try:
-        with open(DATA_FILE, "r") as f:
+
+def load_data():
+    if os.path.exists(EXPENSES_FILE):
+        with open(EXPENSES_FILE, "r") as f:
             return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return []
+    return []
 
-def save_expenses(expenses):
-    with open(DATA_FILE, "w") as f:
-        json.dump(expenses, f, indent=4)
 
-def add_expense(amount, category, description=""):
-    expenses = load_expenses()
+def save_data(data):
+    with open(EXPENSES_FILE, "w") as f:
+        json.dump(data, f, indent=4)
+
+
+def load_settings():
+    if os.path.exists(SETTINGS_FILE):
+        with open(SETTINGS_FILE, "r") as f:
+            return json.load(f)
+    return {"currency": "KES", "budgets": {}}  # defaults
+
+
+def save_settings(settings):
+    with open(SETTINGS_FILE, "w") as f:
+        json.dump(settings, f, indent=4)
+
+
+def add_expense():
+    data = load_data()
+    settings = load_settings()
+
+    category = input("Enter category (e.g., Food, Transport): ").title()
+    amount = float(input("Enter amount: "))
+    description = input("Enter description: ")
+    currency = settings.get("currency", "KES")
+
     expense = {
-        "amount": amount,
+        "id": len(data) + 1,
         "category": category,
+        "amount": amount,
+        "currency": currency,
         "description": description,
         "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
-    expenses.append(expense)
-    save_expenses(expenses)
-    print(f"✅ Added: {amount} - {category} ({description})")
+    data.append(expense)
+    save_data(data)
 
-def view_expenses(period="all"):
-    expenses = load_expenses()
-    if not expenses:
-        print("No expenses recorded yet.")
+    # Budget check
+    budget = settings["budgets"].get(category)
+    if budget:
+        total = sum(e["amount"] for e in data if e["category"] == category)
+        if total > budget:
+            print(f"⚠️ Warning: You have exceeded your budget for {category} ({total}/{budget} {currency})")
+
+    print("✅ Expense added successfully!")
+
+
+def view_expenses():
+    data = load_data()
+    if not data:
+        print("No expenses found.")
+        return
+    for e in data:
+        print(f"[{e['id']}] {e['date']} | {e['category']}: {e['amount']} {e['currency']} - {e['description']}")
+
+
+def summary_by_category():
+    data = load_data()
+    if not data:
+        print("No expenses found.")
+        return
+    summary = {}
+    for e in data:
+        summary[e["category"]] = summary.get(e["category"], 0) + e["amount"]
+
+    settings = load_settings()
+    currency = settings.get("currency", "KES")
+
+    print("\n--- Category Summary ---")
+    for cat, total in summary.items():
+        print(f"{cat}: {total} {currency}")
+
+
+def search_expenses():
+    data = load_data()
+    if not data:
+        print("No expenses found.")
         return
 
-    now = datetime.now()
-    if period == "daily":
-        expenses = [e for e in expenses if datetime.strptime(e["date"], "%Y-%m-%d %H:%M:%S").date() == now.date()]
-    elif period == "weekly":
-        week_ago = now - timedelta(days=7)
-        expenses = [e for e in expenses if datetime.strptime(e["date"], "%Y-%m-%d %H:%M:%S") >= week_ago]
-    elif period == "monthly":
-        month_ago = now - timedelta(days=30)
-        expenses = [e for e in expenses if datetime.strptime(e["date"], "%Y-%m-%d %H:%M:%S") >= month_ago]
-
-    if not expenses:
-        print(f"No {period} expenses found.")
+    choice = input("Search by (1) Category or (2) Amount greater than: ")
+    if choice == "1":
+        category = input("Enter category: ").title()
+        results = [e for e in data if e["category"] == category]
+    elif choice == "2":
+        amount = float(input("Enter minimum amount: "))
+        results = [e for e in data if e["amount"] >= amount]
+    else:
+        print("Invalid choice.")
         return
 
-    table = [[e["date"], e["amount"], e["category"], e["description"]] for e in expenses]
-    print(tabulate(table, headers=["Date", "Amount", "Category", "Description"], tablefmt="grid"))
+    if results:
+        for e in results:
+            print(f"[{e['id']}] {e['date']} | {e['category']}: {e['amount']} {e['currency']} - {e['description']}")
+    else:
+        print("No matching expenses found.")
 
-def export_csv(filename="expenses.csv"):
-    expenses = load_expenses()
-    if not expenses:
-        print("No expenses to export.")
-        return
-    with open(filename, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=["date", "amount", "category", "description"])
-        writer.writeheader()
-        writer.writerows(expenses)
-    print(f"📁 Exported to {filename}")
 
-def menu():
+def delete_expense():
+    data = load_data()
+    view_expenses()
+    exp_id = int(input("Enter the ID of the expense to delete: "))
+    data = [e for e in data if e["id"] != exp_id]
+    # reassign IDs
+    for i, e in enumerate(data, start=1):
+        e["id"] = i
+    save_data(data)
+    print("✅ Expense deleted successfully!")
+
+
+def update_expense():
+    data = load_data()
+    view_expenses()
+    exp_id = int(input("Enter the ID of the expense to update: "))
+    for e in data:
+        if e["id"] == exp_id:
+            print("Leave blank to keep current value.")
+            category = input(f"New category ({e['category']}): ") or e["category"]
+            amount = input(f"New amount ({e['amount']}): ")
+            description = input(f"New description ({e['description']}): ")
+
+            if amount:
+                e["amount"] = float(amount)
+            e["category"] = category
+            e["description"] = description
+
+            save_data(data)
+            print("✅ Expense updated successfully!")
+            return
+    print("Expense not found.")
+
+
+def set_currency():
+    settings = load_settings()
+    currency = input("Enter default currency (e.g., KES, USD, EUR): ").upper()
+    settings["currency"] = currency
+    save_settings(settings)
+    print(f"✅ Default currency set to {currency}")
+
+
+def set_budget():
+    settings = load_settings()
+    category = input("Enter category to set budget for: ").title()
+    amount = float(input("Enter budget amount: "))
+    settings["budgets"][category] = amount
+    save_settings(settings)
+    print(f"✅ Budget set for {category}: {amount} {settings['currency']}")
+
+
+def main():
     while True:
-        print("\n--- Personal Expense Tracker ---")
+        print("\nExpense Tracker")
         print("1. Add Expense")
-        print("2. View Daily Expenses")
-        print("3. View Weekly Expenses")
-        print("4. View Monthly Expenses")
-        print("5. View All Expenses")
-        print("6. Export to CSV")
-        print("0. Exit")
+        print("2. View Expenses")
+        print("3. Summary by Category")
+        print("4. Search Expenses")
+        print("5. Delete Expense")
+        print("6. Update Expense")
+        print("7. Set Currency")
+        print("8. Set Budget")
+        print("9. Exit")
 
-        choice = input("Enter choice: ")
+        choice = input("Choose an option: ")
+
         if choice == "1":
-            amount = float(input("Amount: "))
-            category = input("Category: ")
-            description = input("Description (optional): ")
-            add_expense(amount, category, description)
+            add_expense()
         elif choice == "2":
-            view_expenses("daily")
+            view_expenses()
         elif choice == "3":
-            view_expenses("weekly")
+            summary_by_category()
         elif choice == "4":
-            view_expenses("monthly")
+            search_expenses()
         elif choice == "5":
-            view_expenses("all")
+            delete_expense()
         elif choice == "6":
-            export_csv()
-        elif choice == "0":
+            update_expense()
+        elif choice == "7":
+            set_currency()
+        elif choice == "8":
+            set_budget()
+        elif choice == "9":
+            print("Goodbye!")
             break
         else:
-            print("❌ Invalid choice.")
+            print("Invalid choice, try again.")
+
 
 if __name__ == "__main__":
-    menu()
+    main()
