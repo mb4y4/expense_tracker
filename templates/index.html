@@ -1,31 +1,92 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>Expense Tracker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        table {
+            width: 70%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table, th, td {
+            border: 1px solid #ccc;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+        .over-budget {
+            color: red;
+            font-weight: bold;
+        }
+        .form-section {
+            margin-bottom: 30px;
+        }
+    </style>
 </head>
 <body>
+
     <h1>Expense Tracker</h1>
 
-    <form method="POST" action="/add">
-        Category: <input type="text" name="category" required>
-        Amount: <input type="number" step="0.01" name="amount" required>
-        Currency: <input type="text" name="currency" value="KES" required>
-        Description: <input type="text" name="description">
-        <button type="submit">Add Expense</button>
-    </form>
+    <!-- Add Expense Form -->
+    <div class="form-section">
+        <form action="/add" method="post">
+            <input type="number" step="0.01" name="amount" placeholder="Amount" required>
+            <input type="text" name="category" placeholder="Category" required>
+            <input type="text" name="description" placeholder="Description">
+            <button type="submit">Add Expense</button>
+        </form>
+    </div>
 
-    <h2>Expenses</h2>
-    <table border="1">
-        <tr><th>Category</th><th>Amount</th><th>Currency</th><th>Description</th><th>Date</th></tr>
-        {% for e in expenses %}
+    <!-- Category Totals + Budgets -->
+    <h2>Category Summary</h2>
+    <table>
         <tr>
-            <td>{{e[1]}}</td>
-            <td>{{e[2]}}</td>
-            <td>{{e[3]}}</td>
-            <td>{{e[4]}}</td>
-            <td>{{e[5]}}</td>
+            <th>Category</th>
+            <th>Total Spent</th>
+            <th>Budget</th>
+        </tr>
+        {% for category, total in category_totals.items() %}
+        <tr>
+            <td>{{ category }}</td>
+            <td class="{% if total > budgets[category] %}over-budget{% endif %}">
+                {{ total }}
+            </td>
+            <td>{{ budgets[category] }}</td>
         </tr>
         {% endfor %}
     </table>
+
+    <!-- Expense List -->
+    <h2>All Expenses</h2>
+    <table>
+        <tr>
+            <th>ID</th>
+            <th>Amount</th>
+            <th>Category</th>
+            <th>Description</th>
+            <th>Date</th>
+            <th>Action</th>
+        </tr>
+        {% for exp in expenses %}
+        <tr>
+            <td>{{ exp[0] }}</td>
+            <td>{{ exp[1] }}</td>
+            <td>{{ exp[2] }}</td>
+            <td>{{ exp[3] }}</td>
+            <td>{{ exp[4] }}</td>
+            <td><a href="{{ url_for('delete', expense_id=exp[0]) }}">Delete</a></td>
+        </tr>
+        {% endfor %}
+    </table>
+
 </body>
 </html>

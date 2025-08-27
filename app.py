@@ -1,37 +1,46 @@
 from flask import Flask, render_template, request, redirect, url_for
-import sqlite3
+from db_handler import init_db, add_expense, get_all_expenses, delete_expense
 
 app = Flask(__name__)
 
-DB_NAME = "expenses.db"
+# Define budgets for categories
+budgets = {
+    "Food": 500,
+    "Transport": 300,
+    "Entertainment": 200,
+    "Utilities": 400,
+    "Other": 150
+}
 
-# Home route (list expenses)
 @app.route("/")
 def index():
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, category, amount, currency, description, date FROM expenses")
-    expenses = cursor.fetchall()
-    conn.close()
-    return render_template("index.html", expenses=expenses)
+    expenses = get_all_expenses()
+    
+    # Calculate totals per category
+    category_totals = {cat: 0 for cat in budgets}
+    for exp in expenses:
+        amount = exp[1]  # correct, amount
+        category = exp[2]  # correct, category string
+        if category in category_totals:
+            category_totals[category] += amount
 
-# Add expense
+    
+    return render_template("index.html", expenses=expenses, budgets=budgets, category_totals=category_totals)
+
 @app.route("/add", methods=["POST"])
 def add():
-    category = request.form["category"]
     amount = float(request.form["amount"])
-    currency = request.form["currency"]
-    description = request.form["description"]
-
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO expenses (category, amount, currency, description, date) VALUES (?, ?, ?, ?, DATE('now'))",
-        (category, amount, currency, description)
-    )
-    conn.commit()
-    conn.close()
+    category = request.form["category"]
+    description = request.form["description"]  # <-- correct field
+    add_expense(amount, category, description)
     return redirect(url_for("index"))
 
+
+@app.route("/delete/<int:expense_id>")
+def delete(expense_id):
+    delete_expense(expense_id)
+    return redirect("/")
+
 if __name__ == "__main__":
+    init_db()
     app.run(debug=True)

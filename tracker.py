@@ -1,4 +1,17 @@
-from db_handler import add_expense, get_expenses, delete_expense
+from db_handler import (
+    add_expense, get_expenses, delete_expense,
+    search_by_category, search_by_date, search_by_amount
+)
+
+def display_expenses(expenses):
+    if not expenses:
+        print("⚠️ No matching expenses found.")
+    else:
+        print("\n--- Expenses ---")
+        print("{:<5} {:<12} {:<12} {:<10} {:<6} {}".format("ID", "Date", "Category", "Amount", "Curr", "Description"))
+        print("-"*60)
+        for row in expenses:
+            print("{:<5} {:<12} {:<12} {:<10.2f} {:<6} {}".format(row[0], row[1], row[2], row[3], row[4], row[5]))
 
 def main():
     while True:
@@ -6,7 +19,8 @@ def main():
         print("1. Add Expense")
         print("2. View All Expenses")
         print("3. Delete Expense")
-        print("4. Exit")
+        print("4. Search / Filter")
+        print("5. Exit")
 
         choice = input("Enter choice: ")
 
@@ -20,15 +34,7 @@ def main():
             print("✅ Expense added!")
 
         elif choice == "2":
-            expenses = get_expenses()
-            if not expenses:
-                print("⚠️ No expenses found.")
-            else:
-                print("\n--- All Expenses ---")
-                print("{:<5} {:<12} {:<12} {:<10} {:<6} {}".format("ID", "Date", "Category", "Amount", "Curr", "Description"))
-                print("-"*60)
-                for row in expenses:
-                    print("{:<5} {:<12} {:<12} {:<10.2f} {:<6} {}".format(row[0], row[1], row[2], row[3], row[4], row[5]))
+            display_expenses(get_expenses())
 
         elif choice == "3":
             expense_id = int(input("Enter Expense ID to delete: "))
@@ -36,6 +42,29 @@ def main():
             print("🗑️ Expense deleted!")
 
         elif choice == "4":
+            print("\n--- Search / Filter ---")
+            print("a) By Category")
+            print("b) By Date (YYYY-MM-DD)")
+            print("c) By Amount Range")
+            sub = input("Choose option: ").lower()
+
+            if sub == "a":
+                cat = input("Enter category: ")
+                display_expenses(search_by_category(cat))
+
+            elif sub == "b":
+                date = input("Enter date (YYYY-MM-DD): ")
+                display_expenses(search_by_date(date))
+
+            elif sub == "c":
+                min_amt = float(input("Enter minimum amount: "))
+                max_amt = float(input("Enter maximum amount: "))
+                display_expenses(search_by_amount(min_amt, max_amt))
+
+            else:
+                print("⚠️ Invalid choice.")
+
+        elif choice == "5":
             print("👋 Exiting. Goodbye!")
             break
 
