@@ -2,45 +2,59 @@ from flask import Flask, render_template, request, redirect, url_for
 from db_handler import init_db, add_expense, get_all_expenses, delete_expense
 
 app = Flask(__name__)
+init_db()
 
-# Define budgets for categories
+# Predefined categories
+categories = [
+    "Food",
+    "Transport",
+    "Entertainment",
+    "Bills",
+    "Shopping",
+    "Miscellaneous"
+]
+
+# Example budgets
 budgets = {
-    "Food": 500,
-    "Transport": 300,
-    "Entertainment": 200,
-    "Utilities": 400,
-    "Other": 150
+    "Food": 2000,
+    "Transport": 1500,
+    "Entertainment": 1000,
+    "Bills": 3000,
+    "Shopping": 2500,
+    "Miscellaneous": 1000
 }
 
-@app.route("/")
+@app.route("/", methods=["GET"])
 def index():
     expenses = get_all_expenses()
-    
-    # Calculate totals per category
-    category_totals = {cat: 0 for cat in budgets}
-    for exp in expenses:
-        amount = exp[1]  # correct, amount
-        category = exp[2]  # correct, category string
-        if category in category_totals:
-            category_totals[category] += amount
 
-    
-    return render_template("index.html", expenses=expenses, budgets=budgets, category_totals=category_totals)
+    # Initialize category totals
+    category_totals = {category: 0 for category in categories}
+
+    # Sum up expenses by category
+    for exp in expenses:
+        category_totals[exp["category"]] += float(exp["amount"])
+
+    return render_template(
+        "index.html",
+        expenses=expenses,
+        categories=categories,
+        budgets=budgets,
+        category_totals=category_totals
+    )
 
 @app.route("/add", methods=["POST"])
 def add():
+    description = request.form["description"]
     amount = float(request.form["amount"])
     category = request.form["category"]
-    description = request.form["description"]  # <-- correct field
-    add_expense(amount, category, description)
+    add_expense(description, amount, category)
     return redirect(url_for("index"))
 
-
-@app.route("/delete/<int:expense_id>")
+@app.route("/delete/<int:expense_id>", methods=["POST"])
 def delete(expense_id):
     delete_expense(expense_id)
-    return redirect("/")
+    return redirect(url_for("index"))
 
 if __name__ == "__main__":
-    init_db()
     app.run(debug=True)
